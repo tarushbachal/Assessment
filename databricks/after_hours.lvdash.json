@@ -1,0 +1,178 @@
+{
+  "datasets": [
+    {
+      "name": "kpis",
+      "displayName": "KPIs",
+      "queryLines": [
+        "SELECT\n",
+        "  SUM(is_telephone * is_after_hours) AS after_hours_telephone_appts,\n",
+        "  ROUND(AVG(CASE WHEN is_telephone = 1 AND is_after_hours = 1 THEN is_noshow END) * 100, 1) AS ah_tel_noshow_pct,\n",
+        "  ROUND(AVG(CASE WHEN is_after_hours = 1 AND is_telephone = 0 THEN is_noshow END) * 100, 1) AS ah_inperson_noshow_pct,\n",
+        "  ROUND(SUM(is_telephone * is_after_hours) * 100.0 / SUM(is_after_hours), 1) AS telephone_share_of_ah_pct\n",
+        "FROM workspace.default.appointment_clean"
+      ]
+    },
+    {
+      "name": "demand",
+      "displayName": "Demand by day & hour",
+      "queryLines": [
+        "SELECT day_of_week, dow_num, appt_hour, SUM(is_completed) AS completed_appts\n",
+        "FROM workspace.default.appointment_clean\n",
+        "WHERE is_telephone = 1 AND is_after_hours = 1\n",
+        "GROUP BY day_of_week, dow_num, appt_hour ORDER BY dow_num, appt_hour"
+      ]
+    },
+    {
+      "name": "staffing",
+      "displayName": "Staffing curve",
+      "queryLines": [
+        "WITH window_load AS (\n",
+        "  SELECT appt_date, is_weekend, FLOOR(appt_min_of_day / 30) AS win30, COUNT(*) AS load\n",
+        "  FROM workspace.default.appointment_clean\n",
+        "  WHERE is_telephone = 1 AND is_after_hours = 1 AND is_completed = 1\n",
+        "  GROUP BY appt_date, is_weekend, FLOOR(appt_min_of_day / 30)),\n",
+        "evening_peak AS (SELECT appt_date, is_weekend, MAX(load) AS peak FROM window_load GROUP BY appt_date, is_weekend)\n",
+        "SELECT CASE WHEN is_weekend = 1 THEN 'Weekend' ELSE 'Weekday' END AS day_type,\n",
+        "  CEIL(percentile(peak, 0.5) / 3.0) AS minimum,\n",
+        "  CEIL(percentile(peak, 0.95) / 3.0) AS recommended,\n",
+        "  CEIL(MAX(peak) / 3.0) AS peak\n",
+        "FROM evening_peak GROUP BY is_weekend ORDER BY is_weekend"
+      ]
+    },
+    {
+      "name": "booking_lead",
+      "displayName": "No-show by booking lead",
+      "queryLines": [
+        "SELECT CASE\n",
+        "    WHEN booking_lead_min < 30 THEN '1 <30 min'\n",
+        "    WHEN booking_lead_min < 60 THEN '2 30-60 min'\n",
+        "    WHEN booking_lead_min < 120 THEN '3 1-2 hr'\n",
+        "    WHEN booking_lead_min < 240 THEN '4 2-4 hr'\n",
+        "    ELSE '5 4 hr+' END AS booking_lead_bucket,\n",
+        "  COUNT(*) AS appointments,\n",
+        "  ROUND(AVG(is_noshow) * 100, 1) AS noshow_pct\n",
+        "FROM workspace.default.appointment_clean\n",
+        "WHERE is_telephone = 1 AND is_after_hours = 1 GROUP BY 1 ORDER BY 1"
+      ]
+    },
+    {
+      "name": "by_day",
+      "displayName": "No-show by day of week",
+      "queryLines": [
+        "SELECT day_of_week, dow_num, COUNT(*) AS appointments,\n",
+        "  ROUND(AVG(is_noshow) * 100, 1) AS noshow_pct\n",
+        "FROM workspace.default.appointment_clean\n",
+        "WHERE is_telephone = 1 AND is_after_hours = 1\n",
+        "GROUP BY day_of_week, dow_num ORDER BY dow_num"
+      ]
+    },
+    {
+      "name": "monthly",
+      "displayName": "Adoption & no-show by month",
+      "queryLines": [
+        "SELECT appt_month,\n",
+        "  ROUND(SUM(is_telephone * is_after_hours) * 100.0 / SUM(is_after_hours), 1) AS telephone_share_pct,\n",
+        "  ROUND(AVG(CASE WHEN is_telephone = 1 AND is_after_hours = 1 THEN is_noshow END) * 100, 1) AS ah_tel_noshow_pct\n",
+        "FROM workspace.default.appointment_clean GROUP BY appt_month ORDER BY appt_month"
+      ]
+    },
+    {
+      "name": "providers",
+      "displayName": "Provider no-show",
+      "queryLines": [
+        "SELECT PROVIDER_ID, COUNT(*) AS appointments, ROUND(AVG(is_noshow) * 100, 1) AS noshow_pct\n",
+        "FROM workspace.default.appointment_clean\n",
+        "WHERE is_telephone = 1 AND is_after_hours = 1\n",
+        "GROUP BY PROVIDER_ID HAVING COUNT(*) >= 50 ORDER BY noshow_pct DESC"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "main",
+      "displayName": "After-Hours Telephone Clinic",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_volume",
+            "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "after_hours_telephone_appts", "expression": "`after_hours_telephone_appts`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "after_hours_telephone_appts", "displayName": "After-hours telephone appts"}}}
+          },
+          "position": {"x": 0, "y": 0, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_tel_noshow",
+            "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "ah_tel_noshow_pct", "expression": "`ah_tel_noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "ah_tel_noshow_pct", "displayName": "Telephone no-show %"}}}
+          },
+          "position": {"x": 1, "y": 0, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_inperson_noshow",
+            "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "ah_inperson_noshow_pct", "expression": "`ah_inperson_noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "ah_inperson_noshow_pct", "displayName": "In-person no-show %"}}}
+          },
+          "position": {"x": 2, "y": 0, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_share",
+            "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "telephone_share_of_ah_pct", "expression": "`telephone_share_of_ah_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "telephone_share_of_ah_pct", "displayName": "Telephone share of after-hours %"}}}
+          },
+          "position": {"x": 3, "y": 0, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "demand_heatmap",
+            "queries": [{"name": "main_query", "query": {"datasetName": "demand", "fields": [{"name": "appt_hour", "expression": "`appt_hour`"}, {"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "completed_appts", "expression": "`completed_appts`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "heatmap", "encodings": {"x": {"fieldName": "appt_hour", "scale": {"type": "categorical"}, "displayName": "Hour"}, "y": {"fieldName": "day_of_week", "scale": {"type": "categorical"}, "displayName": "Day"}, "color": {"fieldName": "completed_appts", "scale": {"type": "quantitative"}, "displayName": "Completed"}}}
+          },
+          "position": {"x": 0, "y": 3, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "booking_lead_bar",
+            "queries": [{"name": "main_query", "query": {"datasetName": "booking_lead", "fields": [{"name": "booking_lead_bucket", "expression": "`booking_lead_bucket`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "booking_lead_bucket", "scale": {"type": "categorical"}, "displayName": "Booking lead"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 0, "y": 9, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "by_day_bar",
+            "queries": [{"name": "main_query", "query": {"datasetName": "by_day", "fields": [{"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}, {"name": "dow_num", "expression": "`dow_num`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "day_of_week", "scale": {"type": "categorical", "sort": {"by": "dow_num"}}, "displayName": "Day"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 3, "y": 9, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "monthly_line",
+            "queries": [{"name": "main_query", "query": {"datasetName": "monthly", "fields": [{"name": "appt_month", "expression": "`appt_month`"}, {"name": "telephone_share_pct", "expression": "`telephone_share_pct`"}, {"name": "ah_tel_noshow_pct", "expression": "`ah_tel_noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "appt_month", "scale": {"type": "categorical"}, "displayName": "Month"}, "y": {"fieldName": "telephone_share_pct", "scale": {"type": "quantitative"}, "displayName": "%"}}}
+          },
+          "position": {"x": 0, "y": 15, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "staffing_table",
+            "queries": [{"name": "main_query", "query": {"datasetName": "staffing", "fields": [{"name": "day_type", "expression": "`day_type`"}, {"name": "minimum", "expression": "`minimum`"}, {"name": "recommended", "expression": "`recommended`"}, {"name": "peak", "expression": "`peak`"}], "disaggregated": true}}],
+            "spec": {"version": 1, "widgetType": "table", "encodings": {"columns": [{"fieldName": "day_type", "displayName": "Day type"}, {"fieldName": "minimum", "displayName": "Minimum"}, {"fieldName": "recommended", "displayName": "Recommended"}, {"fieldName": "peak", "displayName": "Peak"}]}}
+          },
+          "position": {"x": 3, "y": 15, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "provider_bar",
+            "queries": [{"name": "main_query", "query": {"datasetName": "providers", "fields": [{"name": "PROVIDER_ID", "expression": "`PROVIDER_ID`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "PROVIDER_ID", "scale": {"type": "categorical", "sort": {"by": "noshow_pct", "order": "descending"}}, "displayName": "Provider"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 0, "y": 21, "width": 6, "height": 6}
+        }
+      ]
+    }
+  ]
+}
