@@ -43,16 +43,15 @@
       "name": "booking_lead",
       "displayName": "No-show by booking lead",
       "queryLines": [
-        "SELECT CASE\n",
-        "    WHEN booking_lead_min < 30 THEN '1 <30 min'\n",
-        "    WHEN booking_lead_min < 60 THEN '2 30-60 min'\n",
-        "    WHEN booking_lead_min < 120 THEN '3 1-2 hr'\n",
-        "    WHEN booking_lead_min < 240 THEN '4 2-4 hr'\n",
-        "    ELSE '5 4 hr+' END AS booking_lead_bucket,\n",
+        "SELECT\n",
+        "  CASE WHEN booking_lead_min < 30 THEN '<30 min' WHEN booking_lead_min < 60 THEN '30-60 min'\n",
+        "       WHEN booking_lead_min < 120 THEN '1-2 hr' WHEN booking_lead_min < 240 THEN '2-4 hr' ELSE '4 hr+' END AS booking_lead_bucket,\n",
+        "  CASE WHEN booking_lead_min < 30 THEN 1 WHEN booking_lead_min < 60 THEN 2\n",
+        "       WHEN booking_lead_min < 120 THEN 3 WHEN booking_lead_min < 240 THEN 4 ELSE 5 END AS sort_order,\n",
         "  COUNT(*) AS appointments,\n",
         "  ROUND(AVG(is_noshow) * 100, 1) AS noshow_pct\n",
         "FROM workspace.default.appointment_clean\n",
-        "WHERE is_telephone = 1 AND is_after_hours = 1 GROUP BY 1 ORDER BY 1"
+        "WHERE is_telephone = 1 AND is_after_hours = 1 GROUP BY 1, 2 ORDER BY 2"
       ]
     },
     {
@@ -91,86 +90,115 @@
     {
       "name": "main",
       "displayName": "After-Hours Telephone Clinic",
+      "pageType": "PAGE_TYPE_CANVAS",
       "layout": [
+        {
+          "widget": {
+            "name": "header",
+            "textbox_spec": "# After-Hours Telephone Clinic — Access, Reliability & Staffing\nSame-day, on-demand access channel · Mid-Atlantic · Dec 2009 – Jun 2010 · **synthetic data (no PHI)**"
+          },
+          "position": {"x": 0, "y": 0, "width": 12, "height": 3}
+        },
         {
           "widget": {
             "name": "kpi_volume",
             "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "after_hours_telephone_appts", "expression": "`after_hours_telephone_appts`"}], "disaggregated": true}}],
-            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "after_hours_telephone_appts", "displayName": "After-hours telephone appts"}}}
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"showTitle": true, "title": "After-hours telephone visits"}, "encodings": {"value": {"fieldName": "after_hours_telephone_appts", "displayName": "Visits"}}}
           },
-          "position": {"x": 0, "y": 0, "width": 1, "height": 3}
+          "position": {"x": 0, "y": 3, "width": 3, "height": 5}
         },
         {
           "widget": {
             "name": "kpi_tel_noshow",
             "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "ah_tel_noshow_pct", "expression": "`ah_tel_noshow_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "ah_tel_noshow_pct", "displayName": "Telephone no-show %"}}}
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"showTitle": true, "title": "Telephone no-show rate (%)"}, "encodings": {"value": {"fieldName": "ah_tel_noshow_pct", "displayName": "%"}}}
           },
-          "position": {"x": 1, "y": 0, "width": 1, "height": 3}
+          "position": {"x": 3, "y": 3, "width": 3, "height": 5}
         },
         {
           "widget": {
             "name": "kpi_inperson_noshow",
             "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "ah_inperson_noshow_pct", "expression": "`ah_inperson_noshow_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "ah_inperson_noshow_pct", "displayName": "In-person no-show %"}}}
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"showTitle": true, "title": "In-person no-show (%) · benchmark"}, "encodings": {"value": {"fieldName": "ah_inperson_noshow_pct", "displayName": "%"}}}
           },
-          "position": {"x": 2, "y": 0, "width": 1, "height": 3}
+          "position": {"x": 6, "y": 3, "width": 3, "height": 5}
         },
         {
           "widget": {
             "name": "kpi_share",
             "queries": [{"name": "main_query", "query": {"datasetName": "kpis", "fields": [{"name": "telephone_share_of_ah_pct", "expression": "`telephone_share_of_ah_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "telephone_share_of_ah_pct", "displayName": "Telephone share of after-hours %"}}}
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"showTitle": true, "title": "Telephone share of after-hours (%)"}, "encodings": {"value": {"fieldName": "telephone_share_of_ah_pct", "displayName": "%"}}}
           },
-          "position": {"x": 3, "y": 0, "width": 1, "height": 3}
+          "position": {"x": 9, "y": 3, "width": 3, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "sec_q1",
+            "textbox_spec": "## Q1 · Demand & staffing\nBusiest 30-minute window each evening drives the physician count (10-min slots → ~3 patients / physician / 30 min)."
+          },
+          "position": {"x": 0, "y": 8, "width": 12, "height": 2}
         },
         {
           "widget": {
             "name": "demand_heatmap",
-            "queries": [{"name": "main_query", "query": {"datasetName": "demand", "fields": [{"name": "appt_hour", "expression": "`appt_hour`"}, {"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "completed_appts", "expression": "`completed_appts`"}], "disaggregated": true}}],
-            "spec": {"version": 3, "widgetType": "heatmap", "encodings": {"x": {"fieldName": "appt_hour", "scale": {"type": "categorical"}, "displayName": "Hour"}, "y": {"fieldName": "day_of_week", "scale": {"type": "categorical"}, "displayName": "Day"}, "color": {"fieldName": "completed_appts", "scale": {"type": "quantitative"}, "displayName": "Completed"}}}
+            "queries": [{"name": "main_query", "query": {"datasetName": "demand", "fields": [{"name": "appt_hour", "expression": "`appt_hour`"}, {"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "dow_num", "expression": "`dow_num`"}, {"name": "completed_appts", "expression": "`completed_appts`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "heatmap", "frame": {"showTitle": true, "title": "Completed telephone visits by day & hour"}, "encodings": {"x": {"fieldName": "appt_hour", "scale": {"type": "categorical"}, "displayName": "Hour of day"}, "y": {"fieldName": "day_of_week", "scale": {"type": "categorical", "sort": {"by": "dow_num", "order": "ascending"}}, "displayName": "Day"}, "color": {"fieldName": "completed_appts", "scale": {"type": "quantitative"}, "displayName": "Completed visits"}}}
           },
-          "position": {"x": 0, "y": 3, "width": 6, "height": 6}
-        },
-        {
-          "widget": {
-            "name": "booking_lead_bar",
-            "queries": [{"name": "main_query", "query": {"datasetName": "booking_lead", "fields": [{"name": "booking_lead_bucket", "expression": "`booking_lead_bucket`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "booking_lead_bucket", "scale": {"type": "categorical"}, "displayName": "Booking lead"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
-          },
-          "position": {"x": 0, "y": 9, "width": 3, "height": 6}
-        },
-        {
-          "widget": {
-            "name": "by_day_bar",
-            "queries": [{"name": "main_query", "query": {"datasetName": "by_day", "fields": [{"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}, {"name": "dow_num", "expression": "`dow_num`"}], "disaggregated": true}}],
-            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "day_of_week", "scale": {"type": "categorical", "sort": {"by": "dow_num"}}, "displayName": "Day"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
-          },
-          "position": {"x": 3, "y": 9, "width": 3, "height": 6}
-        },
-        {
-          "widget": {
-            "name": "monthly_line",
-            "queries": [{"name": "main_query", "query": {"datasetName": "monthly", "fields": [{"name": "appt_month", "expression": "`appt_month`"}, {"name": "telephone_share_pct", "expression": "`telephone_share_pct`"}, {"name": "ah_tel_noshow_pct", "expression": "`ah_tel_noshow_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "appt_month", "scale": {"type": "categorical"}, "displayName": "Month"}, "y": {"fieldName": "telephone_share_pct", "scale": {"type": "quantitative"}, "displayName": "%"}}}
-          },
-          "position": {"x": 0, "y": 15, "width": 3, "height": 6}
+          "position": {"x": 0, "y": 10, "width": 8, "height": 9}
         },
         {
           "widget": {
             "name": "staffing_table",
             "queries": [{"name": "main_query", "query": {"datasetName": "staffing", "fields": [{"name": "day_type", "expression": "`day_type`"}, {"name": "minimum", "expression": "`minimum`"}, {"name": "recommended", "expression": "`recommended`"}, {"name": "peak", "expression": "`peak`"}], "disaggregated": true}}],
-            "spec": {"version": 1, "widgetType": "table", "encodings": {"columns": [{"fieldName": "day_type", "displayName": "Day type"}, {"fieldName": "minimum", "displayName": "Minimum"}, {"fieldName": "recommended", "displayName": "Recommended"}, {"fieldName": "peak", "displayName": "Peak"}]}}
+            "spec": {"version": 1, "widgetType": "table", "frame": {"showTitle": true, "title": "Physicians needed per evening"}, "encodings": {"columns": [{"fieldName": "day_type", "displayName": "Day type"}, {"fieldName": "minimum", "displayName": "Minimum"}, {"fieldName": "recommended", "displayName": "Recommended"}, {"fieldName": "peak", "displayName": "Peak / surge"}]}}
           },
-          "position": {"x": 3, "y": 15, "width": 3, "height": 6}
+          "position": {"x": 8, "y": 10, "width": 4, "height": 9}
+        },
+        {
+          "widget": {
+            "name": "sec_q2",
+            "textbox_spec": "## Q2 · Effectiveness & reliability\nWell-adopted and low-cost — but a 19.4% no-show rate (≈2× in-person) is the reliability leak."
+          },
+          "position": {"x": 0, "y": 19, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "monthly_line",
+            "queries": [{"name": "main_query", "query": {"datasetName": "monthly", "fields": [{"name": "appt_month", "expression": "`appt_month`"}, {"name": "telephone_share_pct", "expression": "`telephone_share_pct`"}, {"name": "ah_tel_noshow_pct", "expression": "`ah_tel_noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "line", "frame": {"showTitle": true, "title": "Adoption vs no-show trend (%)"}, "encodings": {"x": {"fieldName": "appt_month", "scale": {"type": "categorical"}, "displayName": "Month"}, "y": {"fieldName": "telephone_share_pct", "scale": {"type": "quantitative"}, "displayName": "Telephone share %"}, "color": {"fieldName": "ah_tel_noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 0, "y": 21, "width": 6, "height": 8}
+        },
+        {
+          "widget": {
+            "name": "by_day_bar",
+            "queries": [{"name": "main_query", "query": {"datasetName": "by_day", "fields": [{"name": "day_of_week", "expression": "`day_of_week`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}, {"name": "dow_num", "expression": "`dow_num`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"showTitle": true, "title": "No-show rate by day of week (%)"}, "encodings": {"x": {"fieldName": "day_of_week", "scale": {"type": "categorical", "sort": {"by": "dow_num", "order": "ascending"}}, "displayName": "Day"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 6, "y": 21, "width": 6, "height": 8}
+        },
+        {
+          "widget": {
+            "name": "sec_q3",
+            "textbox_spec": "## Q3 · What drives no-shows\nLast-minute bookings and a wide physician spread are the actionable levers."
+          },
+          "position": {"x": 0, "y": 29, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "booking_lead_bar",
+            "queries": [{"name": "main_query", "query": {"datasetName": "booking_lead", "fields": [{"name": "booking_lead_bucket", "expression": "`booking_lead_bucket`"}, {"name": "sort_order", "expression": "`sort_order`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"showTitle": true, "title": "No-show rate by booking lead time (%)"}, "encodings": {"x": {"fieldName": "booking_lead_bucket", "scale": {"type": "categorical", "sort": {"by": "sort_order", "order": "ascending"}}, "displayName": "Booked ahead"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+          },
+          "position": {"x": 0, "y": 31, "width": 6, "height": 8}
         },
         {
           "widget": {
             "name": "provider_bar",
             "queries": [{"name": "main_query", "query": {"datasetName": "providers", "fields": [{"name": "PROVIDER_ID", "expression": "`PROVIDER_ID`"}, {"name": "noshow_pct", "expression": "`noshow_pct`"}], "disaggregated": true}}],
-            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "PROVIDER_ID", "scale": {"type": "categorical", "sort": {"by": "noshow_pct", "order": "descending"}}, "displayName": "Provider"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"showTitle": true, "title": "No-show rate by physician (≥50 visits, %)"}, "encodings": {"x": {"fieldName": "PROVIDER_ID", "scale": {"type": "categorical", "sort": {"by": "noshow_pct", "order": "descending"}}, "displayName": "Physician"}, "y": {"fieldName": "noshow_pct", "scale": {"type": "quantitative"}, "displayName": "No-show %"}}}
           },
-          "position": {"x": 0, "y": 21, "width": 6, "height": 6}
+          "position": {"x": 6, "y": 31, "width": 6, "height": 8}
         }
       ]
     }

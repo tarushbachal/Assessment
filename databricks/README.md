@@ -28,6 +28,21 @@ Bronze table assumed at **`workspace.default.appointment_data`**. No Genie, no d
 - **Adoption/no-show by month** → stable ~60% adoption.
 - **Provider no-show** → 0–43% spread, coaching lever.
 
+## Design (enterprise layout)
+The `.lvdash.json` is built to read top-to-bottom like an exec dashboard, on the **12-column grid**:
+- **Title banner** (markdown) with context + a "synthetic data (no PHI)" note.
+- **KPI row** — 4 titled counter cards (volume, telephone no-show, in-person benchmark, adoption). Titles fix the "unlabelled numbers" problem.
+- **Section headers** (`## Q1 / Q2 / Q3`) as markdown widgets, each with a one-line takeaway.
+- **Q1** demand heatmap (days sorted Mon→Sun) + staffing table side by side.
+- **Q2** adoption/no-show trend line + no-show by day.
+- **Q3** no-show by booking lead + by physician.
+
+**Optional 2-minute polish in the UI (not codeable reliably, so do by hand):**
+- Set a **dashboard theme** (⋮ → *Theme*) — pick a dark or branded theme for consistent colors.
+- To make the KPI cards pop, select each counter → widget **style** → background/border `#1F354B`, font `#EBEBEB` (Databricks' own recommendation for emphasis cards).
+- On the telephone no-show counter, add **conditional formatting** (red if > 15%) to signal the weakness.
+- On counters, the value **format** (e.g. `%` suffix, thousands separator) is set in the widget's *Value* settings — I left it default so import is robust; add the `%`/comma there for the final look.
+
 ## Troubleshooting
 - **Silver view returns 0 rows / null dates:** the bronze columns may already be typed as `TIMESTAMP`
   rather than `STRING`. The view already tries both formats via `try_to_timestamp`, so this should be
